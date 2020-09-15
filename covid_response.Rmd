@@ -1,0 +1,122 @@
+---
+title: "covid_response"
+output: html_document
+---
+
+Import required libraries
+```{r}
+library(tidyverse)
+library(readr)
+library(ggthemes)
+library(scales)
+library(ggrepel)
+library(readxl)
+library(forcats)
+library(directlabels)
+library(fitdistrplus)
+```
+
+Download COVID data. Do some initial exploratory analysis
+```{r}
+covid <- read_csv('United_States_COVID-19_Cases_and_Deaths_by_State_over_Time.csv')
+
+# Cases vs deaths by state
+
+covid_by_state <- covid %>% 
+  group_by(state) %>% 
+  summarise(total_cases = sum(tot_cases)/1000,
+            total_deaths = sum(tot_death)/1000)
+
+ggsave('covid_by_state.png',
+ggplot(data = covid_by_state, aes(x = total_cases, y = total_deaths)) +
+  geom_point() +
+  geom_text_repel(data = subset(covid_by_state, total_cases > 20000), aes(label = state)) +
+  labs(title = "COVID-19 Cases vs Deaths by State, in Thousands",
+       x = 'Cases (in Thousands)', 
+       y = 'Deaths (in Thousands)') +
+  scale_y_continuous(labels = comma) +
+  scale_x_continuous(labels = comma) +
+  stat_summary(fun.data= mean_cl_normal) + 
+  geom_smooth(method='lm')
+)
+
+# Already there are clear outliers in the data. NYC, for example, has the unfortunate distinction of the most number of deaths, even despite it being broken out from the rest of the state. New Jersey, too, has deaths much higher than the proportion of cases it had. Texas, Florida, and California, on the other hand, have high numbers of cases but relatively few numbers of deaths.
+
+# This is a VERY ROUGH linear regression based on just number of cases and number of deaths. Of course, it is much more complicated than this! But this gives a general understanding of which states have more deaths per cases. 
+```
+
+
+```{r}
+pops <- read_xlsx('SCPRC-EST2019-18+POP-RES.xlsx', skip = 8)
+state_abbrevs <- read_xlsx('State_Abbrevs.xlsx')
+
+colnames(pops) <- c("state", 'population', 'pop_over_18', 'perc_pop_over_18')
+
+covid_rates_by_pop_perc <- pops %>% 
+  dplyr::select(state, population) %>% 
+  mutate(state = str_remove(state, '^.')) %>% 
+  mutate(state = ifelse(state == 'uerto Rico', 'Puerto Rico', state)) %>% 
+  filter(population > 0) %>% 
+  full_join(., state_abbrevs) %>% 
+  rename(state_full = state,
+         state = abbreviation) %>% 
+  full_join(., covid) %>% 
+  filter(tot_cases > 0) %>% 
+  mutate(state_full = ifelse(state == 'NYC', 'NYC', state)) %>% 
+  mutate(population = ifelse(state == 'GU', 167294,
+                             ifelse(state == 'MP', 51994,
+                                    ifelse(state == 'VI', 104393,
+                                           ifelse(state == 'NYC', 8336817, population))))) %>% 
+  dplyr::select(state_full, population, state, submission_date, tot_cases) %>% 
+  mutate(perc_pop = tot_cases/population) %>% 
+  filter(perc_pop > 0.01) %>% 
+  distinct(state, .keep_all = T) %>% 
+  mutate(submission_date = as.Date(submission_date, format = '%m/%d/%Y')) %>% 
+  full_join(., covid_by_state) %>% 
+  filter(tot_cases > 0) %>% 
+  mutate(state = fct_reorder(state, desc(submission_date)))
+
+# Look at a bar graph of deaths per state, ordered by when states had cases in more than 1% of population
+ggsave('covid_by_pop_perc_bar.png',
+covid_rates_by_pop_perc %>% 
+  ggplot(aes(x = state, y = total_deaths)) +
+    geom_bar(stat = 'identity') +
+    geom_dl(aes(label = submission_date), method = list('last.points', cex = .8)) +
+    coord_flip(clip = 'off') +
+    scale_y_continuous(labels = comma) +
+    labs(title = 'COVID-19 Deaths per State, in Thousands',
+         subtitle = 'Arranged in the order COVID cases reached > 1% of the state population')
+, height = 10, width = 7)
+
+
+# If we saw a skewed normal distribution, we may say that states are learning the lessons of the earlier states and reducing deaths. What we see here, however, is a beta distribution after we bootstrap the data 1,000
+ggsave('cullen_and_fray_beta.png',
+covid_rates_by_pop_perc %>% 
+  mutate(state = fct_reorder(state, submission_date)) %>% 
+  arrange(submission_date) %>% 
+  pull(total_deaths) %>% 
+  descdist(discrete = F, boot = 1000)
+)
+
+covid_by_date <- covid_rates_by_pop_perc %>% 
+  mutate(state = fct_reorder(state, submission_date)) %>% 
+  arrange(submission_date)
+
+ggsave('covid_by_pop_perc_scatter.png',
+covid_by_date %>%   
+  ggplot(aes(x = state, y = total_deaths)) +
+    geom_point(stat = 'identity') +
+    geom_path(group = 1) +
+    geom_text_repel(data = subset(covid_by_date, total_deaths > 1000), aes(label = as.character(submission_date))) +
+    scale_y_continuous(labels = comma) +
+    labs(title = 'COVID-19 Deaths per State, in Thousands',
+         subtitle = 'Arranged in the order COVID cases reached > 1% of the state population',
+         y = "Total Deaths (in Thousands)",
+         x = "State") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+)
+
+
+# There's a few rows with missing information, which we'll fill in manually here (get the population data from worldometer)
+
+```
