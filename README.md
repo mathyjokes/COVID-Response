@@ -17,13 +17,17 @@ First of all, let’s take an initial look at the Case vs Death rate in differen
 Already there are clear outliers in the data. NYC, for example, has the unfortunate distinction of the most number of deaths, even despite it being broken out from the rest of the state. New Jersey, too, has deaths much higher than the proportion of cases it had. Texas, Florida, and California, on the other hand, have high numbers of cases but relatively few numbers of deaths.
 The graph includes a very rough linear regression based on just number of cases and number of deaths. Of course, it is much more complicated than this! But this fitted line gives a general understanding of which states have more deaths per cases than normal.
 
-Next, we look at the death rates in different states, arranged in the order of when a state had a “significant” number of cases (>1% of population).
+We also want to consider *when* these cases are occuring. To fully re-open our economy, we will likely have to go through a period with high cases, but hopefully with low death rates.
+So, do states with earlier surges have higher death rates? Are states re-opening now seeing many cases but fewer deaths?
+
+The graph displays death rates by state, but arranges the states along the x-axis in the order in which the states reached a "significant" number of cases. For this analysis, a "significant" number of cases means that the case number was greater than 1% of the state's population. If states that have only recently reached a significant number of cases have much lower death rates, we can infer that these states are re-opening safely.
 
 ![deaths_by_pop](https://github.com/mathyjokes/COVID-Response/blob/master/covid_by_pop_perc_scatter.png)
 
 There does not seem to be a clear trend here in the number of deaths over time, either rising or falling. It is important to note that New York falls to the right side of the graph (reaching a significant number of cases on August 14, 2020) even though it had a large share of cases early on.
+
 If states re-opening learned from the challenges faced by other states, we would expect to see a long right tail to this graph. But there is no clear distribution that these deaths over time follow. To check this intuition, we can attempt to fit a distribution to the data using a skewness-kurtosis graph. After bootstrapping 1,000 times, it is still clear that no easily-recognizable distribution will fit our data.
  
 ![cullen_frey](https://github.com/mathyjokes/COVID-Response/blob/master/cullen_and_frey_beta.png)
 
-This analysis does not conclude either way if states seeing surges now are learning the lessons from earlier and reopening safely.
+This analysis is inconclusive – it is not clear if states seeing surges now are learning the lessons from earlier and re-opening safely. 
